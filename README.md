@@ -1,6 +1,6 @@
 # MicroSlate
 
-A dedicated distraction-free writing firmware built for **ESP32-S3** e-paper device. Based on the original repo from Josh-Write. 
+A dedicated distraction-free writing firmware built for **[Reterminal Sticky](https://www.seeedstudio.com/sticky/)** e-paper device. Based on the original repo from Josh-Write. 
 https://github.com/Josh-writes/microslate-firmware.
 
 Pairs with any **Bluetooth LE (BLE)** keyboard, supports physical button navigation, and saves notes to MicroSD.
