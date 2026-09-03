@@ -105,8 +105,8 @@ When a Bluetooth keyboard is paired, you can navigate the entire interface and e
 
 ```bash
 # Clone the repository
-git clone https://github.com/Josh-writes/microslate-firmware
-cd microslate-firmware
+git clone https://github.com/chalei/microslate-sticky.git
+cd microslate-sticky
 
 # Build firmware for ESP32-S3
 pio run -e microslate_s3
