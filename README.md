@@ -1,3 +1,4 @@
+To Be Edited
 # MicroSlate
 
 A dedicated writing firmware for the **Xteink X4** e-paper device. Pairs with any **Bluetooth LE (BLE)** keyboard and saves notes to MicroSD.
