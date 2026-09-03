@@ -326,17 +326,16 @@ static bool setupHidConnection() {
     return false;
   }
 
-  // If we have a specific input report char (from report ref or boot keyboard),
-  // and we haven't already subscribed to it, subscribe now
-  if (pInputReportChar->getUUID() != reportUUID || !pInputReportChar->canNotify()) {
-    DBG_PRINTF("[BLE] Subscribing to char %s\n", pInputReportChar->getUUID().toString().c_str());
+  // Subscribe to the selected input report characteristic.
+  // Even if we found it via Report Reference descriptor, we still need to call subscribe().
+  if (pInputReportChar) {
+    DBG_PRINTF("[BLE] Subscribing to input report char (handle=%d, reportId=%d)...\n",
+               pInputReportChar->getHandle(), inputReportId);
     if (!pInputReportChar->subscribe(true, onKeyboardNotify)) {
-      DBG_PRINTLN("[BLE] Subscribe failed");
+      DBG_PRINTLN("[BLE] Subscribe FAILED");
       return false;
     }
     DBG_PRINTLN("[BLE] Subscribe succeeded");
-  } else {
-    DBG_PRINTLN("[BLE] Already subscribed to report char(s)");
   }
 
   DBG_PRINTLN("[BLE] HID setup complete");

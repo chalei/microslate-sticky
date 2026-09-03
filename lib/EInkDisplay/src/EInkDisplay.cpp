@@ -137,10 +137,10 @@ void EInkDisplay::begin() {
   // Initialize to white
   memset(frameBuffer0, 0xFF, BUFFER_SIZE);
 #ifdef EINK_DISPLAY_SINGLE_BUFFER_MODE
-  if (Serial) Serial.printf("[%lu]   Static frame buffer (%lu bytes = 48KB)\n", millis(), BUFFER_SIZE);
+  if (Serial) Serial.printf("[%lu]   Static frame buffer (%u bytes = 48KB)\n", millis(), BUFFER_SIZE);
 #else
   memset(frameBuffer1, 0xFF, BUFFER_SIZE);
-  if (Serial) Serial.printf("[%lu]   Static frame buffers (2 x %lu bytes = 96KB)\n", millis(), BUFFER_SIZE);
+  if (Serial) Serial.printf("[%lu]   Static frame buffers (2 x %u bytes = 96KB)\n", millis(), BUFFER_SIZE);
 #endif
 
   if (Serial) Serial.printf("[%lu]   Initializing e-ink display driver...\n", millis());
@@ -350,7 +350,7 @@ void EInkDisplay::drawImage(const uint8_t* imageData, const uint16_t x, const ui
 void EInkDisplay::writeRamBuffer(uint8_t ramBuffer, const uint8_t* data, uint32_t size) {
   const char* bufferName = (ramBuffer == CMD_WRITE_RAM_BW) ? "BW" : "RED";
   const unsigned long startTime = millis();
-  if (Serial) Serial.printf("[%lu]   Writing frame buffer to %s RAM (%lu bytes)...\n", startTime, bufferName, size);
+  if (Serial) Serial.printf("[%lu]   Writing frame buffer to %s RAM (%u bytes)...\n", startTime, bufferName, size);
 
   sendCommand(ramBuffer);
   sendData(data, size);
@@ -490,7 +490,7 @@ void EInkDisplay::displayWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h, 
   const uint16_t windowWidthBytes = w / 8;
   const uint32_t windowBufferSize = windowWidthBytes * h;
 
-  if (Serial) Serial.printf("[%lu]   Window buffer size: %lu bytes (%d x %d pixels)\n", millis(), windowBufferSize, w, h);
+  if (Serial) Serial.printf("[%lu]   Window buffer size: %u bytes (%d x %d pixels)\n", millis(), windowBufferSize, w, h);
 
   // Allocate temporary buffer on stack
   std::vector<uint8_t> windowBuffer(windowBufferSize);

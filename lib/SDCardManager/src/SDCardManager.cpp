@@ -1,7 +1,7 @@
 #include "SDCardManager.h"
 
 namespace {
-constexpr uint8_t SD_CS = 12;
+constexpr uint8_t SD_CS = 8;   // SD_D3/CS on MicroSlate S3
 constexpr uint32_t SPI_FQ = 40000000;
 }
 

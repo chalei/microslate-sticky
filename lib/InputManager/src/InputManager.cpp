@@ -1,23 +1,7 @@
 #include "InputManager.h"
 #include <driver/adc.h>
 
-// Recorded ADC values from real devices
-// BACK CONF LEFT RGHT   UP DOWN
-// 3597 2760 1530    6 2300    6
-// 3470 2666 1480    6 2222    5
-// 3470 2655 1470    3 2205    3
-
-// Averages
-// BACK CONF LEFT RGHT   UP DOWN
-// 3512 2694 1493    5 2242    5
-
-// Setup ranges, if ADC value is between value `i` and `i + 1`, button `i` is being pressed
-// These ranges are based on real world values above, and are much more tolerant of different
-// devices than a fixed threshold check
-// These values are calculated by taking the midpoint of the pairs of averaged values above
-const int InputManager::ADC_RANGES_1[] = {ADC_NO_BUTTON, 3100, 2090, 750, INT32_MIN};
-const int InputManager::ADC_RANGES_2[] = {ADC_NO_BUTTON, 1120, INT32_MIN};
-const char* InputManager::BUTTON_NAMES[] = {"Back", "Confirm", "Left", "Right", "Up", "Down", "Power"};
+const char* InputManager::BUTTON_NAMES[] = {"Up", "Down", "Power"};
 
 InputManager::InputManager()
     : currentState(0),
@@ -29,46 +13,27 @@ InputManager::InputManager()
       buttonPressFinish(0) {}
 
 void InputManager::begin() {
-  // Configure ADC using ESP-IDF API directly to avoid GPIO reconfiguration
-  // that Arduino's analogRead() triggers on every call in the dual framework
+  // Configure digital button GPIOs with internal pull-ups (active LOW)
+  pinMode(UP_PIN, INPUT_PULLUP);
+  pinMode(DOWN_PIN, INPUT_PULLUP);
+  pinMode(POWER_PIN, INPUT_PULLUP);
+
+  // Configure ADC for battery voltage monitoring (GPIO9 = ADC1_CHANNEL_8 on ESP32-S3)
   adc1_config_width(ADC_WIDTH_BIT_12);
-  adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_12);  // GPIO 0 (battery)
-  adc1_config_channel_atten(ADC1_CHANNEL_1, ADC_ATTEN_DB_12);  // GPIO 1
-  adc1_config_channel_atten(ADC1_CHANNEL_2, ADC_ATTEN_DB_12);  // GPIO 2
-
-  // Power button is digital, keep using Arduino API
-  pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
-}
-
-int InputManager::getButtonFromADC(const int adcValue, const int ranges[], const int numButtons) {
-  for (int i = 0; i < numButtons; i++) {
-    if (ranges[i + 1] < adcValue && adcValue <= ranges[i]) {
-      return i;
-    }
-  }
-
-  return -1;
+  adc1_config_channel_atten(ADC1_CHANNEL_8, ADC_ATTEN_DB_12);  // GPIO 9 (battery)
 }
 
 uint8_t InputManager::getState() {
   uint8_t state = 0;
 
-  // Read GPIO1 buttons using ESP-IDF API (no GPIO reconfiguration overhead)
-  const int adcValue1 = adc1_get_raw(ADC1_CHANNEL_1);
-  const int button1 = getButtonFromADC(adcValue1, ADC_RANGES_1, NUM_BUTTONS_1);
-  if (button1 >= 0) {
-    state |= (1 << button1);
+  // Read digital buttons (active LOW with pull-ups)
+  if (digitalRead(UP_PIN) == LOW) {
+    state |= (1 << BTN_UP);
   }
-
-  // Read GPIO2 buttons using ESP-IDF API
-  const int adcValue2 = adc1_get_raw(ADC1_CHANNEL_2);
-  const int button2 = getButtonFromADC(adcValue2, ADC_RANGES_2, NUM_BUTTONS_2);
-  if (button2 >= 0) {
-    state |= (1 << (button2 + 4));
+  if (digitalRead(DOWN_PIN) == LOW) {
+    state |= (1 << BTN_DOWN);
   }
-
-  // Read power button (digital, active LOW)
-  if (digitalRead(POWER_BUTTON_PIN) == LOW) {
+  if (digitalRead(POWER_PIN) == LOW) {
     state |= (1 << BTN_POWER);
   }
 

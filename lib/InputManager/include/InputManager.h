@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <driver/adc.h>
 
 class InputManager {
  public:
@@ -63,19 +62,15 @@ class InputManager {
    */
   unsigned long getHeldTime() const;
 
-  // Button indices
-  static constexpr uint8_t BTN_BACK = 0;
-  static constexpr uint8_t BTN_CONFIRM = 1;
-  static constexpr uint8_t BTN_LEFT = 2;
-  static constexpr uint8_t BTN_RIGHT = 3;
-  static constexpr uint8_t BTN_UP = 4;
-  static constexpr uint8_t BTN_DOWN = 5;
-  static constexpr uint8_t BTN_POWER = 6;
+  // Button indices (3-button layout for MicroSlate S3)
+  static constexpr uint8_t BTN_UP    = 0;
+  static constexpr uint8_t BTN_DOWN  = 1;
+  static constexpr uint8_t BTN_POWER = 2;
 
-  // Pins
-  static constexpr int BUTTON_ADC_PIN_1 = 1;
-  static constexpr int BUTTON_ADC_PIN_2 = 2;
-  static constexpr int POWER_BUTTON_PIN = 3;
+  // Digital GPIO pins
+  static constexpr int UP_PIN    = 5;   // BUTTON_UP
+  static constexpr int DOWN_PIN  = 6;   // BUTTON_DOWN
+  static constexpr int POWER_PIN = 4;   // PWR_BUTTON
 
   // Power button methods
   bool isPowerButtonPressed() const;
@@ -84,8 +79,6 @@ class InputManager {
   static const char* getButtonName(uint8_t buttonIndex);
 
  private:
-  int getButtonFromADC(int adcValue, const int ranges[], int numButtons);
-
   uint8_t currentState;
   uint8_t lastState;
   uint8_t pressedEvents;
@@ -94,14 +87,7 @@ class InputManager {
   unsigned long buttonPressStart;
   unsigned long buttonPressFinish;
 
-  static constexpr int NUM_BUTTONS_1 = 4;
-  static const int ADC_RANGES_1[];
-
-  static constexpr int NUM_BUTTONS_2 = 2;
-  static const int ADC_RANGES_2[];
-
-  static constexpr int ADC_NO_BUTTON = 3800;
-  static constexpr unsigned long DEBOUNCE_DELAY = 5;
+  static constexpr unsigned long DEBOUNCE_DELAY = 20;  // 20ms debounce for mechanical switches
 
   static const char* BUTTON_NAMES[];
 };

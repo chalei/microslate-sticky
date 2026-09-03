@@ -21,7 +21,7 @@ uint16_t BatteryMonitor::readMillivolts() const
     constexpr int NUM_SAMPLES = 7;
     uint16_t samples[NUM_SAMPLES];
     for (int i = 0; i < NUM_SAMPLES; i++) {
-        samples[i] = adc1_get_raw(ADC1_CHANNEL_0);
+        samples[i] = adc1_get_raw(ADC1_CHANNEL_8);
         if (i < NUM_SAMPLES - 1) delayMicroseconds(500);
     }
     // Simple insertion sort for median
@@ -41,7 +41,7 @@ uint16_t BatteryMonitor::readMillivolts() const
 
 uint16_t BatteryMonitor::readRawMillivolts() const
 {
-    return adc1_get_raw(ADC1_CHANNEL_0);
+    return adc1_get_raw(ADC1_CHANNEL_8);
 }
 
 double BatteryMonitor::readVolts() const

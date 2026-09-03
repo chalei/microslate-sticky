@@ -1,5 +1,5 @@
 #########################################################################
-# If you edit this file, delete sdkconfig.xteink_x4 to let it rebuild.
+# If you edit this file, delete sdkconfig.microslate_s3 to let it rebuild.
 #########################################################################
 
 #
@@ -29,7 +29,8 @@ CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1=y
 CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL=y
 
 #
-# PHY power down when idle
+# PSRAM (ESP32-S3 modules often include PSRAM)
 #
-CONFIG_ESP_PHY_MAC_BB_PD=y
-
+CONFIG_ESP32S3_SPIRAM_SUPPORT=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y

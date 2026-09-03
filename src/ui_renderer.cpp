@@ -614,7 +614,7 @@ void drawBluetoothSettings(GfxRenderer& renderer, HalGPIO& gpio) {
   if (passkey > 0) {
     char passkeyStr[32];
     drawClippedText(renderer, FONT_UI, 20, 100, "PAIRING CODE:", 0, tc, EpdFontFamily::BOLD);
-    snprintf(passkeyStr, sizeof(passkeyStr), "%06lu", passkey);
+    snprintf(passkeyStr, sizeof(passkeyStr), "%06u", passkey);
     drawClippedText(renderer, FONT_BODY, 20, 130, passkeyStr, 0, tc, EpdFontFamily::BOLD);
     drawClippedText(renderer, FONT_SMALL, 20, 160, "Type this code on your keyboard", 0, tc);
     drawClippedText(renderer, FONT_SMALL, 20, 180, "then press Enter", 0, tc);

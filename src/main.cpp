@@ -246,7 +246,7 @@ void setup() {
   // CONFIG_PM_ENABLE and CONFIG_FREERTOS_USE_TICKLESS_IDLE are compiled into
   // ESP-IDF via sdkconfig.defaults (framework = arduino, espidf). BLE modem
   // sleep keeps the radio alive across sleep/wake cycles.
-  esp_pm_config_esp32c3_t pm_config = {
+  esp_pm_config_esp32s3_t pm_config = {
     .max_freq_mhz = 80,
     .min_freq_mhz = 10,
     .light_sleep_enable = true
@@ -288,34 +288,54 @@ void enterDeepSleep(SleepReason reason) {
   // Will not return - device is asleep
 }
 
+// Forward declaration — defined later in this file
+void registerActivity();
+
 // Translate physical button presses to HID key codes
 // NOTE: gpio.update() is called in loop() before this function
+//
+// Button mapping (MicroSlate S3):
+//   Power (GPIO4): short press = Confirm/Enter, long press (3s) = deep sleep
+//   Up    (GPIO5): navigate up
+//   Down  (GPIO6): navigate down
+//   Up+Down combo: Back/Escape
 static void processPhysicalButtons() {
   static bool btnUpLast = false;
   static bool btnDownLast = false;
-  static bool btnLeftLast = false;
-  static bool btnRightLast = false;
-  static bool btnConfirmLast = false;
-  static bool btnBackLast = false;
+  static bool btnPowerLast = false;
 
-  // Use isPressed() — persistent debounced state.  With one-shot scanning
-  // (radio quiet during navigation), InputManager debounce works reliably.
-  bool btnUp      = gpio.isPressed(HalGPIO::BTN_UP);
-  bool btnDown    = gpio.isPressed(HalGPIO::BTN_DOWN);
-  bool btnLeft    = gpio.isPressed(HalGPIO::BTN_LEFT);
-  bool btnRight   = gpio.isPressed(HalGPIO::BTN_RIGHT);
-  bool btnConfirm = gpio.isPressed(HalGPIO::BTN_CONFIRM);
-  bool btnBack    = gpio.isPressed(HalGPIO::BTN_BACK);
+  bool btnUp    = gpio.isPressed(HalGPIO::BTN_UP);
+  bool btnDown  = gpio.isPressed(HalGPIO::BTN_DOWN);
+  bool btnPower = gpio.isPressed(HalGPIO::BTN_POWER);
 
-  // Power button state machine for proper long/short press handling
+  // --- Up+Down combo detection for Back/Escape ---
+  static bool comboFired = false;
+  bool bothPressed = btnUp && btnDown;
+
+  if (bothPressed && !comboFired) {
+    comboFired = true;
+    // Fire Escape (Back)
+    if (currentState == UIState::TEXT_EDITOR && editorHasUnsavedChanges()) {
+      saveCurrentFile();
+    }
+    if (currentState == UIState::TEXT_EDITOR) {
+      currentState = UIState::FILE_BROWSER;
+      screenDirty = true;
+    } else {
+      enqueueKeyEvent(HID_KEY_ESCAPE, 0, true);
+      enqueueKeyEvent(HID_KEY_ESCAPE, 0, false);
+    }
+  }
+  if (!btnUp && !btnDown) {
+    comboFired = false;
+  }
+
+  // --- Power button: short press = Enter, long press = deep sleep ---
   static bool powerHeld = false;
   static unsigned long powerPressStart = 0;
   static bool sleepTriggered = false;
 
-  bool btnPower = gpio.isPressed(HalGPIO::BTN_POWER);
-
   if (btnPower && !powerHeld) {
-    // Button just pressed
     powerHeld = true;
     sleepTriggered = false;
     powerPressStart = millis();
@@ -325,92 +345,25 @@ static void processPhysicalButtons() {
     if (millis() - powerPressStart > 3000) {
       sleepTriggered = true;
       enterDeepSleep(SleepReason::POWER_LONGPRESS);
-      return; // Exit early to prevent further processing
+      return;
     }
   }
 
   if (!btnPower && powerHeld) {
-    // Button released
     unsigned long duration = millis() - powerPressStart;
     powerHeld = false;
 
     if (!sleepTriggered && duration > 50 && duration < 1000) {
-      // Short press - go to main menu (except when already there)
-      if (currentState != UIState::MAIN_MENU) {
-        if (currentState == UIState::TEXT_EDITOR && editorHasUnsavedChanges()) {
-          saveCurrentFile();
-        }
-        currentState = UIState::MAIN_MENU;
-        screenDirty = true;
-      }
+      // Short press = Enter/Confirm
+      enqueueKeyEvent(HID_KEY_ENTER, 0, true);
+      enqueueKeyEvent(HID_KEY_ENTER, 0, false);
     }
   }
 
-  // Back button long-press for restart
-  static bool backHeld = false;
-  static unsigned long backPressStart = 0;
-  static bool restartTriggered = false;
-
-  if (btnBack && !backHeld) {
-    backHeld = true;
-    restartTriggered = false;
-    backPressStart = millis();
-  }
-
-  if (btnBack && backHeld && !restartTriggered) {
-    if (millis() - backPressStart > 5000) {
-      restartTriggered = true;
-      DBG_PRINTLN("BACK held for 5s — restarting device...");
-      if (currentState == UIState::TEXT_EDITOR && editorHasUnsavedChanges()) {
-        saveCurrentFile();
-      }
-      delay(100);
-      ESP.restart();
-    }
-  }
-
-  if (!btnBack && backHeld) {
-    backHeld = false;
-  }
-
-  // Map physical buttons to HID key codes based on current UI state
-  switch (currentState) {
-    case UIState::MAIN_MENU:
-      if ((btnUp && !btnUpLast) || (btnRight && !btnRightLast)) {
-        enqueueKeyEvent(HID_KEY_UP, 0, true);
-        enqueueKeyEvent(HID_KEY_UP, 0, false);
-      }
-      if ((btnDown && !btnDownLast) || (btnLeft && !btnLeftLast)) {
-        enqueueKeyEvent(HID_KEY_DOWN, 0, true);
-        enqueueKeyEvent(HID_KEY_DOWN, 0, false);
-      }
-      if (btnConfirm && !btnConfirmLast) {
-        enqueueKeyEvent(HID_KEY_ENTER, 0, true);
-        enqueueKeyEvent(HID_KEY_ENTER, 0, false);
-      }
-      break;
-
-    case UIState::FILE_BROWSER:
-      if (((btnUp && !btnUpLast) || (btnRight && !btnRightLast)) && getFileCount() > 0) {
-        enqueueKeyEvent(HID_KEY_UP, 0, true);
-        enqueueKeyEvent(HID_KEY_UP, 0, false);
-      }
-      if (((btnDown && !btnDownLast) || (btnLeft && !btnLeftLast)) && getFileCount() > 0) {
-        enqueueKeyEvent(HID_KEY_DOWN, 0, true);
-        enqueueKeyEvent(HID_KEY_DOWN, 0, false);
-      }
-      if (btnConfirm && !btnConfirmLast && getFileCount() > 0) {
-        enqueueKeyEvent(HID_KEY_ENTER, 0, true);
-        enqueueKeyEvent(HID_KEY_ENTER, 0, false);
-      }
-      if (btnBack && !btnBackLast) {
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, true);
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, false);
-      }
-      break;
-
-    case UIState::TEXT_EDITOR: {
-      // Key repeat state for held navigation/backspace keys
+  // --- Up/Down buttons (skip if combo was just fired) ---
+  if (!comboFired) {
+    // Text editor gets key repeat for held navigation
+    if (currentState == UIState::TEXT_EDITOR) {
       static uint8_t repeatKey = 0;
       static unsigned long repeatStart = 0;
       static unsigned long lastRepeat = 0;
@@ -422,15 +375,11 @@ static void processPhysicalButtons() {
         enqueueKeyEvent(k, 0, false);
       };
 
-      // Map currently held button to HID key (0 = none)
       uint8_t heldKey = 0;
-      if      (btnUp)    heldKey = HID_KEY_UP;
-      else if (btnDown)  heldKey = HID_KEY_DOWN;
-      else if (btnLeft)  heldKey = HID_KEY_LEFT;
-      else if (btnRight) heldKey = HID_KEY_RIGHT;
+      if      (btnUp)   heldKey = HID_KEY_UP;
+      else if (btnDown) heldKey = HID_KEY_DOWN;
 
       if (heldKey != repeatKey) {
-        // Key changed — fire immediately on press
         if (heldKey != 0) fireKey(heldKey);
         repeatKey   = heldKey;
         repeatStart = millis();
@@ -442,32 +391,8 @@ static void processPhysicalButtons() {
           lastRepeat = now;
         }
       }
-
-      if (btnConfirm && !btnConfirmLast) {
-        enqueueKeyEvent(HID_KEY_ENTER, 0, true);
-        enqueueKeyEvent(HID_KEY_ENTER, 0, false);
-      }
-      if (btnBack && !btnBackLast) {
-        if (editorHasUnsavedChanges()) saveCurrentFile();
-        currentState = UIState::FILE_BROWSER;
-        screenDirty = true;
-      }
-      break;
-    }
-
-    case UIState::RENAME_FILE:
-    case UIState::NEW_FILE:
-      if (btnConfirm && !btnConfirmLast) {
-        enqueueKeyEvent(HID_KEY_ENTER, 0, true);
-        enqueueKeyEvent(HID_KEY_ENTER, 0, false);
-      }
-      if (btnBack && !btnBackLast) {
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, true);
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, false);
-      }
-      break;
-
-    case UIState::BLUETOOTH_SETTINGS:
+    } else {
+      // All other UI states: simple press detection
       if (btnUp && !btnUpLast) {
         enqueueKeyEvent(HID_KEY_UP, 0, true);
         enqueueKeyEvent(HID_KEY_UP, 0, false);
@@ -476,92 +401,13 @@ static void processPhysicalButtons() {
         enqueueKeyEvent(HID_KEY_DOWN, 0, true);
         enqueueKeyEvent(HID_KEY_DOWN, 0, false);
       }
-      if (btnRight && !btnRightLast) {
-        enqueueKeyEvent(HID_KEY_RIGHT, 0, true);  // Scan
-        enqueueKeyEvent(HID_KEY_RIGHT, 0, false);
-      }
-      if (btnLeft && !btnLeftLast) {
-        enqueueKeyEvent(HID_KEY_LEFT, 0, true);   // Disconnect
-        enqueueKeyEvent(HID_KEY_LEFT, 0, false);
-      }
-      if (btnConfirm && !btnConfirmLast) {
-        enqueueKeyEvent(HID_KEY_ENTER, 0, true);
-        enqueueKeyEvent(HID_KEY_ENTER, 0, false);
-      }
-      if (btnBack && !btnBackLast) {
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, true);
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, false);
-      }
-      break;
-
-    case UIState::PAIRED_KEYBOARDS:
-      if ((btnUp && !btnUpLast) || (btnRight && !btnRightLast)) {
-        enqueueKeyEvent(HID_KEY_UP, 0, true);
-        enqueueKeyEvent(HID_KEY_UP, 0, false);
-      }
-      if ((btnDown && !btnDownLast) || (btnLeft && !btnLeftLast)) {
-        enqueueKeyEvent(HID_KEY_DOWN, 0, true);
-        enqueueKeyEvent(HID_KEY_DOWN, 0, false);
-      }
-      if (btnConfirm && !btnConfirmLast) {
-        enqueueKeyEvent(HID_KEY_ENTER, 0, true);
-        enqueueKeyEvent(HID_KEY_ENTER, 0, false);
-      }
-      if (btnBack && !btnBackLast) {
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, true);
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, false);
-      }
-      break;
-
-    case UIState::WIFI_SYNC:
-      if ((btnUp && !btnUpLast) || (btnRight && !btnRightLast)) {
-        enqueueKeyEvent(HID_KEY_UP, 0, true);
-        enqueueKeyEvent(HID_KEY_UP, 0, false);
-      }
-      if ((btnDown && !btnDownLast) || (btnLeft && !btnLeftLast)) {
-        enqueueKeyEvent(HID_KEY_DOWN, 0, true);
-        enqueueKeyEvent(HID_KEY_DOWN, 0, false);
-      }
-      if (btnConfirm && !btnConfirmLast) {
-        enqueueKeyEvent(HID_KEY_ENTER, 0, true);
-        enqueueKeyEvent(HID_KEY_ENTER, 0, false);
-      }
-      if (btnBack && !btnBackLast) {
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, true);
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, false);
-      }
-      break;
-
-    case UIState::SETTINGS:
-      if ((btnUp && !btnUpLast) || (btnRight && !btnRightLast)) {
-        enqueueKeyEvent(HID_KEY_UP, 0, true);
-        enqueueKeyEvent(HID_KEY_UP, 0, false);
-      }
-      if ((btnDown && !btnDownLast) || (btnLeft && !btnLeftLast)) {
-        enqueueKeyEvent(HID_KEY_DOWN, 0, true);
-        enqueueKeyEvent(HID_KEY_DOWN, 0, false);
-      }
-      if (btnConfirm && !btnConfirmLast) {
-        enqueueKeyEvent(HID_KEY_ENTER, 0, true);
-        enqueueKeyEvent(HID_KEY_ENTER, 0, false);
-      }
-      if (btnBack && !btnBackLast) {
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, true);
-        enqueueKeyEvent(HID_KEY_ESCAPE, 0, false);
-      }
-      break;
-
-    default:
-      break;
+    }
   }
 
   // Update last state
   btnUpLast = btnUp;
   btnDownLast = btnDown;
-  btnLeftLast = btnLeft;
-  btnRightLast = btnRight;
-  btnConfirmLast = btnConfirm;
-  btnBackLast = btnBack;
+  btnPowerLast = btnPower;
 }
 
 // Global variable for activity tracking
@@ -634,9 +480,9 @@ void loop() {
   // Process WiFi sync HTTP clients when active
   if (isWifiSyncActive()) wifiSyncLoop();
 
-  // CRITICAL: Process buttons BEFORE checking wasAnyPressed() to avoid consuming button states
+  // CRITICAL: Process buttons BEFORE checking wasAnyPressed()
   processPhysicalButtons();
-  int inputEventsProcessed = processAllInput(); // Assuming this returns number of events processed
+  int inputEventsProcessed = processAllInput();
 
   // Register activity AFTER button processing (don't consume button states prematurely)
   static unsigned long lastInputTime = 0;

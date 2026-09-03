@@ -1,0 +1,13 @@
+{
+  "name": "TouchPanel",
+  "version": "1.0.0",
+  "description": "GT911 capacitive touch panel driver with gesture detection",
+  "authors": [
+    {
+      "name": "MicroSlate"
+    }
+  ],
+  "dependencies": {},
+  "platforms": "espressif32",
+  "frameworks": ["arduino", "espidf"]
+}
